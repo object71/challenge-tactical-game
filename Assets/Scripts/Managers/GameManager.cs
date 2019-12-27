@@ -2,21 +2,27 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
     public Tile selectedTile;
 
     public Unit[] availableUnits;
-    public Map map;
-    private Player[] players;
+    private Map map;
+    public PathfindingManager pathfinding;
+    public Player[] players;
+    public Player currentPlayer;
+    public bool noMovingAfterTheFirstOne = false;
+    public bool oneActionOnly = false;
 
-    private PathfindingNode[,] graph;
-    private PathfindingNode[] path;
-    private List<PathfindingNode> unexplored;
-    private Player currentPlayer;
+    private Text healthIndicator;
+    private Text movementIndicator;
+    public GameObject overlay;
 
     private static GameManager instance;
+
     public static GameManager GetInstance()
     {
         if (instance == null)
@@ -27,17 +33,17 @@ public class GameManager : MonoBehaviour
         return instance;
     }
 
+    private static WaitForEndOfFrame endOfFrame = new WaitForEndOfFrame();
+    private static WaitForSeconds waitSeconds = new WaitForSeconds(1f);
+
     void Awake()
     {
         map = FindObjectOfType<Map>();
-        players = FindObjectsOfType<Player>();
+        pathfinding = FindObjectOfType<PathfindingManager>();
+        healthIndicator = GameObject.FindGameObjectWithTag("health-points").GetComponent<Text>();
+        movementIndicator = GameObject.FindGameObjectWithTag("move-points").GetComponent<Text>();
 
-        currentPlayer = players[0];
-
-        graph = new PathfindingNode[map.width, map.height];
-
-        path = new PathfindingNode[map.width * map.height];
-        unexplored = new List<PathfindingNode>(map.width * map.height);
+        overlay.SetActive(false);
 
         if (!map)
         {
@@ -50,310 +56,478 @@ public class GameManager : MonoBehaviour
     {
         Unit prefab = availableUnits[Random.Range(0, availableUnits.Length)];
 
-        Unit unit = Instantiate(prefab, new Vector3(3f, 3f), Quaternion.identity, map.transform);
-        unit.SetControllingPlayer(players[0]);
-        map.AddUnit(3, 3, unit);
+        CreateUnit(prefab, players[0], 5, 3);
+        // CreateUnit(prefab, players[0], 6, 3);
+        // CreateUnit(prefab, players[0], 7, 3);
 
-        Unit enemyUnit = Instantiate(prefab, new Vector3(5f, 5f), Quaternion.identity, map.transform);
-        enemyUnit.SetControllingPlayer(players[1]);
-        map.AddUnit(5, 5, enemyUnit);
+        CreateUnit(prefab, players[1], 5, 5);
+        CreateUnit(prefab, players[1], 6, 5);
+        CreateUnit(prefab, players[1], 7, 5);
 
-        InitGraph();
+
+        CalculatePossibleEnemyMoves();
+
+    }
+
+    private void CreateUnit(Unit prefab, Player player, int x, int y)
+    {
+        Unit unit = Instantiate(prefab, new Vector3(x, y), Quaternion.identity, map.transform);
+        unit.SetControllingPlayer(player);
+        map.AddUnit(x, y, unit);
+    }
+
+    private bool GameIsOver()
+    {
+        for (int x = 0; x < map.width; x++)
+        {
+            for (int y = 0; y < map.height; y++)
+            {
+                Tile tile = map.GetTile(x, y);
+                if (tile.unit && tile.unit.controllingPlayer != currentPlayer)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     // Update is called once per frame
     protected void Update()
     {
-        if (Input.GetMouseButtonUp(0))
+        if (!currentPlayer.isAI && Input.GetMouseButtonUp(0))
         {
-            Tile tile = GetClickedElement<Tile>();
+            Tile tile = InteractionHelpers.GetClickedElement<Tile>();
             if (tile)
             {
                 OnTileLeftClicked(tile);
             }
         }
-        else if (Input.GetMouseButtonUp(1))
+        else if (!currentPlayer.isAI && Input.GetMouseButtonUp(1))
         {
-            Tile tile = GetClickedElement<Tile>();
+            Tile tile = InteractionHelpers.GetClickedElement<Tile>();
             if (tile)
             {
                 OnTileRightClicked(tile);
+
+                if (!UnitsHaveActions())
+                {
+                    SwitchPlayer();
+                }
+
             }
         }
-    }
-
-    public T GetClickedElement<T>()
-        where T : class
-    {
-        Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        Vector2 mousePos2D = new Vector2(mousePos.x, mousePos.y);
-
-        RaycastHit2D hit = Physics2D.Raycast(mousePos2D, Vector2.zero);
-
-        if (hit.collider != null)
-        {
-            return hit.collider.gameObject.GetComponent<T>();
-        }
-
-        return null;
     }
 
     public void OnTileLeftClicked(Tile tile)
     {
         if (tile.unit != null)
         {
-            if (selectedTile)
-            {
-                selectedTile.SetIsSelected(false);
-            }
-
-            if (!tile.unit.isMoving)
-            {
-                selectedTile = tile;
-                selectedTile.SetIsSelected(true);
-
-                DijkstraPathfinding(selectedTile);
-                SetTilesInMoveRange(selectedTile);
-            }
-
+            SelectTile(tile);
         }
         else
         {
-            if (selectedTile)
-            {
-                selectedTile.SetIsSelected(false);
-            }
-
-            selectedTile = null;
-
-            ResetGraph();
+            DeselectTile();
         }
     }
 
-    private void SetTilesInMoveRange(Tile tile)
+    private void SelectTile(Tile tile)
     {
-        for (int x = 0; x < map.width; x++)
+        if (selectedTile)
         {
-            for (int y = 0; y < map.height; y++)
-            {
-                PathfindingNode node = graph[x, y];
-                int currentDistance = node.distance;
-                if (node.tile.unit != null)
-                {
-                    if (node.tile.unit.controllingPlayer != currentPlayer && currentDistance <= tile.unit.remainingMovementPoints + tile.unit.attackRange)
-                    {
-                        node.tile.SetIsEnemyWithinRange(true);
-                    }
-                }
-                else if (currentDistance <= tile.unit.remainingMovementPoints)
-                {
-                    map.GetTile(x, y).SetIsInMoveRange(true);
-                }
-                else
-                {
-                    map.GetTile(x, y).SetIsInMoveRange(false);
-                }
-            }
+            selectedTile.SetIsSelected(false);
+            SetUIUnitInformation(null);
+        }
+
+        if (!tile.unit.isMoving)
+        {
+            selectedTile = tile;
+            selectedTile.SetIsSelected(true);
+
+            pathfinding.CalculatePathsAndSetStates(selectedTile);
+            SetUIUnitInformation(tile.unit);
         }
     }
 
-    public void OnTileRightClicked(Tile tile)
+    private void SetUIUnitInformation(Unit unit)
     {
-        if (tile.unit == null && selectedTile != null && selectedTile.unit.controllingPlayer == currentPlayer)
+        if (unit == null)
         {
-            Vector2Int mapPosition = tile.GetMapPosition();
-            int distance = graph[mapPosition.x, mapPosition.y].distance;
-            Tile targetTile = tile;
-
-            if (distance > selectedTile.unit.remainingMovementPoints)
-            {
-                PathfindingNode node = graph[tile.GetMapPosition().x, tile.GetMapPosition().y];
-                while (node.parent != null)
-                {
-                    if (node.distance <= selectedTile.unit.remainingMovementPoints)
-                    {
-                        break;
-                    }
-
-                    node.tile.SetIsCurrentPath(true);
-                    node = node.parent;
-                }
-
-                targetTile = node.tile;
-            }
-
-            MoveToTile(targetTile, mapPosition, distance);
+            healthIndicator.text = "--/--";
+            movementIndicator.text = "--/--";
         }
-        else if (tile.unit != null && tile.unit.controllingPlayer != currentPlayer && selectedTile != null)
+        else
         {
-            Vector2Int coordinate = tile.GetMapPosition();
-            if (!selectedTile.unit.hasAttacked && graph[coordinate.x, coordinate.y].distance <= selectedTile.unit.attackRange)
-            {
-                tile.unit.remainingHealthPoints -= selectedTile.unit.attackDamage;
-                selectedTile.unit.hasAttacked = true;
-
-                tile.unit.PlayBlinkAnimation();
-                selectedTile.unit.PlayBlinkAnimation();
-
-                if (tile.unit.remainingHealthPoints <= 0)
-                {
-                    Destroy(tile.unit.gameObject);
-                }
-            }
+            healthIndicator.text = string.Format("{0}/{1}", unit.remainingHealthPoints, unit.totalHealthPoints);
+            movementIndicator.text = string.Format("{0}/{1}", unit.remainingMovementPoints, unit.totalMovementPoints);
         }
     }
 
-    private void MoveToTile(Tile targetTile, Vector2Int mapPosition, int distance)
+    private void DeselectTile()
     {
-        Unit unit = selectedTile.unit;
-        unit.MoveToTile(targetTile, graph);
+        if (selectedTile)
+        {
+            selectedTile.SetIsSelected(false);
+            SetUIUnitInformation(null);
+        }
 
-        selectedTile.unit.remainingMovementPoints -= distance;
-
-        targetTile.unit = unit;
-        selectedTile.unit = null;
-
-        selectedTile.SetIsSelected(false);
         selectedTile = null;
 
-        ResetGraph();
+        pathfinding.ResetPaths();
     }
 
-    public void DijkstraPathfinding(Tile source)
+    private void HandleMove(Tile currentTile, Tile targetTile)
     {
-        unexplored.Clear();
-        ResetGraph();
-
-        Vector2Int sourceMapPosition = source.GetMapPosition();
-
-        graph[sourceMapPosition.x, sourceMapPosition.y].distance = 0;
-        unexplored.Add(graph[sourceMapPosition.x, sourceMapPosition.y]);
-
-        while (unexplored.Count > 0)
+        if (noMovingAfterTheFirstOne && currentTile.unit.hasMoved)
         {
-            if (unexplored.Count > map.width * map.height)
+            return;
+        }
+
+        Vector2Int mapPosition = targetTile.GetMapPosition();
+
+        Tile reachableTile = pathfinding.GetMaxReachableTile(mapPosition.x, mapPosition.y, currentTile.unit.remainingMovementPoints);
+        Vector2Int reachablePosition = reachableTile.GetMapPosition();
+        int reachableDistance = pathfinding.GetDistanceToNode(reachablePosition.x, reachablePosition.y);
+
+        StartCoroutine(ExecuteMoveAction(reachableTile, currentTile, reachableDistance));
+
+        targetTile.SetIsSelected(false);
+        DeselectTile();
+
+        if (oneActionOnly)
+        {
+            SwitchPlayer();
+        }
+    }
+
+    private void HandleAttack(Tile currentTile, Tile targetTile)
+    {
+        Vector2Int coordinate = targetTile.GetMapPosition();
+        if (!currentTile.unit.hasAttacked)
+        {
+            int distanceToTarget = pathfinding.GetDistanceToNode(coordinate.x, coordinate.y);
+            if (distanceToTarget <= currentTile.unit.attackRange)
             {
-                break;
-            }
+                StartCoroutine(ExecuteAttackAction(targetTile, currentTile));
 
-            unexplored.Sort((x, y) =>
-            {
-                return x.distance - y.distance;
-            });
+                targetTile.SetIsSelected(false);
+                DeselectTile();
 
-            PathfindingNode lowest = unexplored.First();
-            lowest.passed = true;
-
-            unexplored.RemoveAt(0);
-
-            Vector2Int mapPosition = lowest.tile.GetMapPosition();
-
-            // Note: not checking map bounds as they will be walled in anyway
-            for (int xOffset = -1; xOffset <= 1; xOffset++)
-            {
-                for (int yOffset = -1; yOffset <= 1; yOffset++)
+                if (oneActionOnly)
                 {
-
-                    int cost = 5;
-
-                    if (xOffset == 0 && yOffset == 0)
-                    {
-                        // current
-                        continue;
-                    }
-
-                    if (Mathf.Abs(xOffset) == Mathf.Abs(yOffset))
-                    {
-                        // diagonal
-                        cost = 7;
-                    }
-
-                    int nextNodeX = mapPosition.x + xOffset;
-                    int nextNodeY = mapPosition.y + yOffset;
-
-                    if (map.IsWithinBounds(nextNodeX, nextNodeY))
-                    {
-                        PathfindingNode nextNode = graph[nextNodeX, nextNodeY];
-
-                        if (unexplored.Contains(nextNode))
-                        {
-                            if (nextNode.distance > lowest.distance + cost)
-                            {
-                                nextNode.distance = lowest.distance + cost;
-                            }
-                        }
-                        else if (!nextNode.passed && nextNode.tile.IsWalkable() && nextNode.tile.IsFree())
-                        {
-                            nextNode.distance = lowest.distance + cost;
-                            nextNode.parent = lowest;
-                            unexplored.Add(nextNode);
-                        }
-                        else if (!nextNode.passed && nextNode.tile.IsOccupied())
-                        {
-                            nextNode.distance = lowest.distance + cost;
-                            nextNode.parent = lowest;
-                            nextNode.passed = true;
-                        }
-                    }
-
+                    SwitchPlayer();
                 }
             }
+            else if (distanceToTarget <= currentTile.unit.attackRange + currentTile.unit.remainingMovementPoints)
+            {
+                if (noMovingAfterTheFirstOne && currentTile.unit.hasMoved)
+                {
+                    return;
+                }
+
+                int distanceToMove = distanceToTarget - currentTile.unit.attackRange;
+
+                if (distanceToMove > currentTile.unit.remainingMovementPoints)
+                {
+                    return;
+                }
+
+                if (distanceToMove < 7 && currentTile.unit.remainingMovementPoints >= 7)
+                {
+                    distanceToMove = 7;
+                }
+                else if (distanceToMove < 5 && currentTile.unit.remainingMovementPoints >= 5)
+                {
+                    distanceToMove = 5;
+                }
+
+                Vector2Int mapPosition = targetTile.GetMapPosition();
+                Tile reachableTile = pathfinding.GetMaxReachableTile(mapPosition.x, mapPosition.y, distanceToMove);
+
+                if (reachableTile == currentTile)
+                {
+                    return;
+                }
+
+                Vector2Int reachablePosition = reachableTile.GetMapPosition();
+                int reachableDistance = pathfinding.GetDistanceToNode(reachablePosition.x, reachablePosition.y);
+
+                StartCoroutine(ExecuteMoveThenAttack(targetTile, currentTile, reachableTile, reachableDistance));
+
+                currentTile.SetIsSelected(false);
+                reachableTile.SetIsSelected(false);
+                DeselectTile();
+
+                if (oneActionOnly)
+                {
+                    SwitchPlayer();
+                }
+            }
+            else
+            {
+                HandleMove(currentTile, targetTile);
+            }
+
+
+        }
+    }
+
+    public void OnTileRightClicked(Tile targetTile)
+    {
+        Tile currentTile = selectedTile;
+        if (currentTile == null || currentTile.unit == null)
+        {
+            return;
+        }
+
+        if (currentTile.unit.controllingPlayer != currentPlayer)
+        {
+            return;
+        }
+        else
+        {
+            if (targetTile.unit == null)
+            {
+                HandleMove(currentTile, targetTile);
+            }
+            else if (targetTile.unit != null && targetTile.unit.controllingPlayer != currentPlayer)
+            {
+                HandleAttack(currentTile, targetTile);
+            }
+        }
+    }
+
+    public void CheckGameOverState()
+    {
+        if (GameIsOver())
+        {
+            overlay.SetActive(true);
+            Text gameOverText = GameObject.Find("GameOverText").GetComponent<Text>();
+            gameOverText.text = $"Player {currentPlayer.playerId} won!";
+        }
+    }
+
+    public void RestartGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    private IEnumerator ExecuteMoveThenAttack(Tile targetTile, Tile sourceTile, Tile moveToTile, int reachableDistance)
+    {
+        yield return ExecuteMoveAction(moveToTile, sourceTile, reachableDistance);
+        yield return ExecuteAttackAction(targetTile, moveToTile);
+    }
+
+    private IEnumerator ExecuteAttackAction(Tile defendingTile, Tile attackingTile)
+    {
+        attackingTile.unit.hasAttacked = true;
+
+        while (defendingTile.unit && defendingTile.unit.isBeingAttacked)
+        {
+            yield return endOfFrame;
+        }
+
+        if (!defendingTile.unit)
+        {
+            attackingTile.unit.hasAttacked = false;
+        }
+        else
+        {
+            defendingTile.unit.Hit(attackingTile.unit.attackDamage);
+        }
+
+    }
+
+    private IEnumerator ExecuteMoveAction(Tile targetTile, Tile fromTile, int distance)
+    {
+        pathfinding.SetUnitPathDirections(fromTile.unit, targetTile);
+        fromTile.unit.PlayMoveAnimation();
+
+        fromTile.unit.remainingMovementPoints -= distance;
+        targetTile.unit = fromTile.unit;
+        fromTile.unit = null;
+
+        while (targetTile.unit.isMoving)
+        {
+            yield return endOfFrame;
         }
     }
 
     public void OnMouseEnterTile(Tile tile)
     {
-        if (selectedTile && selectedTile.unit.controllingPlayer == currentPlayer)
+        if (selectedTile && selectedTile.unit && selectedTile.unit.controllingPlayer == currentPlayer)
         {
-            for (int x = 0; x < map.width; x++)
+            pathfinding.ShowTrail(tile);
+        }
+    }
+
+    public void SwitchPlayer()
+    {
+        pathfinding.ResetPaths();
+        ResetMovementPoints();
+
+        currentPlayer = players[0] == currentPlayer ? players[1] : players[0];
+
+        if (currentPlayer.isAI)
+        {
+            StartCoroutine(PlayAI());
+        }
+        else
+        {
+            CalculatePossibleEnemyMoves();
+        }
+
+    }
+
+    private IEnumerator PlayAI()
+    {
+
+        for (int x = 0; x < map.width; x++)
+        {
+            for (int y = 0; y < map.height; y++)
             {
-                for (int y = 0; y < map.height; y++)
+                Tile tile = map.GetTile(x, y);
+
+                if (tile.unit)
                 {
-                    map.GetTile(x, y).SetIsCurrentPath(false);
+                    OnTileLeftClicked(tile);
+                    yield return waitSeconds;
+
+                    OnTileRightClicked(FindClosestEnemy());
+                    yield return waitSeconds;
+                }
+
+            }
+        }
+
+        DeselectTile();
+        yield return waitSeconds;
+
+        if (!oneActionOnly)
+        {
+            SwitchPlayer();
+        }
+    }
+
+    private Tile FindClosestEnemy()
+    {
+        Tile closest = null;
+        int closestDistance = int.MaxValue;
+
+        for (int x = 0; x < map.width; x++)
+        {
+            for (int y = 0; y < map.height; y++)
+            {
+                Tile tile = map.GetTile(x, y);
+
+                if (tile.unit && tile.unit.controllingPlayer != currentPlayer)
+                {
+                    int distance = pathfinding.GetDistanceToNode(x, y);
+
+                    if (!closest || distance < closestDistance)
+                    {
+                        closest = tile;
+                    }
                 }
             }
-
-            PathfindingNode node = graph[tile.GetMapPosition().x, tile.GetMapPosition().y];
-            while (node.parent != null)
-            {
-                node.tile.SetIsCurrentPath(true);
-                node = node.parent;
-            }
         }
+
+        return closest;
     }
 
-    private void ResetGraph()
+    private void CalculatePossibleEnemyMoves()
     {
+        pathfinding.ClearPossibleEnemyMoves();
+
         for (int x = 0; x < map.width; x++)
         {
             for (int y = 0; y < map.height; y++)
             {
-                PathfindingNode node = graph[x, y];
-                node.distance = int.MaxValue;
-                node.parent = null;
-                node.passed = false;
-
-                node.tile.SetIsInMoveRange(false);
-                node.tile.SetIsEnemyWithinRange(false);
-                node.tile.SetIsCurrentPath(false);
-            }
-        }
-    }
-
-    private void InitGraph()
-    {
-        for (int x = 0; x < map.width; x++)
-        {
-            for (int y = 0; y < map.height; y++)
-            {
-                graph[x, y] = new PathfindingNode()
+                Tile currentTile = map.GetTile(x, y);
+                if (currentTile.unit && currentTile.unit.controllingPlayer != currentPlayer)
                 {
-                    distance = int.MaxValue,
-                    tile = map.GetTile(x, y),
-                    parent = null,
-                    passed = false
-                };
+                    pathfinding.CalculateEnemyPathsAndSetStates(currentTile);
+                }
             }
         }
+
+    }
+
+    private void ResetMovementPoints()
+    {
+        for (int x = 0; x < map.width; x++)
+        {
+            for (int y = 0; y < map.height; y++)
+            {
+                Tile tile = map.GetTile(x, y);
+
+                if (tile.unit != null)
+                {
+                    tile.unit.hasAttacked = false;
+                    tile.unit.remainingMovementPoints = tile.unit.totalMovementPoints;
+                }
+            }
+        }
+    }
+
+    private bool UnitsHaveActions()
+    {
+        for (int x = 0; x < map.width; x++)
+        {
+            for (int y = 0; y < map.height; y++)
+            {
+                Tile tile = map.GetTile(x, y);
+
+                if (tile.unit != null && tile.unit.controllingPlayer == currentPlayer)
+                {
+                    // only one move and it hasn't moved (not considering a case with a static unit)
+                    if (noMovingAfterTheFirstOne && !tile.unit.hasMoved)
+                    {
+                        return true;
+                    }
+
+                    // has not attacked attack (not checking if enemies within range)
+                    if (!tile.unit.hasAttacked)
+                    {
+                        return true;
+                    }
+
+                    // isn't surrounded and has more movement points
+                    if (tile.unit.remainingMovementPoints >= 5 && !IsSurrounded(x, y, tile.unit.remainingMovementPoints >= 7))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsSurrounded(int x, int y, bool includeDiagonals)
+    {
+        for (int m = -1; m <= 1; m++)
+        {
+            for (int n = -1; n <= 1; n++)
+            {
+                if (m == 0 & n == 0)
+                {
+                    continue;
+                }
+
+                if (!includeDiagonals && Mathf.Abs(m) == Mathf.Abs(n))
+                {
+                    continue;
+                }
+
+                if (!map.GetTile(x + m, y + n).unit)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }

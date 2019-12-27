@@ -24,13 +24,17 @@ public class Map : MonoBehaviour
             Debug.LogWarning("No game manager found");
         }
 
+        GameObject tileHolder = new GameObject("Tiles");
+        tileHolder.transform.position = transform.position;
+        tileHolder.transform.parent = transform;
+
         tiles = new Tile[width, height];
 
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
             {
-                Tile tile = Instantiate(tilePrefab, new Vector3(transform.position.x + x, transform.position.y + y, 5), Quaternion.identity, transform);
+                Tile tile = Instantiate(tilePrefab, new Vector3(transform.position.x + x, transform.position.y + y, 5), Quaternion.identity, tileHolder.transform);
                 if ((x != 0 && x != width - 1) && (y != 0 && y != height - 1))
                 {
                     tile.SetWalkable(true);

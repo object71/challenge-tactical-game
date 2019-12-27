@@ -14,7 +14,8 @@ public class Tile : MonoBehaviour
     public bool isInMoveRange;
     public bool isWithinEnemyMoveRange;
     public bool isCurrentPath;
-    public bool isEnemyWithinRange;
+    public bool isUnitWithinRange;
+    public bool isWithinAttackRange;
 
     // Start is called before the first frame update
     void Awake()
@@ -85,15 +86,21 @@ public class Tile : MonoBehaviour
         UpdateColorState();
     }
 
-    public void SetIsEnemyWithinRange(bool value)
+    public void SetIsUnitWithinRange(bool value)
     {
-        isEnemyWithinRange = value;
+        isUnitWithinRange = value;
         UpdateColorState();
     }
 
     public void SetIsWithinEnemyMoveRange(bool value)
     {
         isWithinEnemyMoveRange = value;
+        UpdateColorState();
+    }
+
+    public void SetIsWithinAttackRange(bool value)
+    {
+        isWithinAttackRange = value;
         UpdateColorState();
     }
 
@@ -105,32 +112,76 @@ public class Tile : MonoBehaviour
 
     public void UpdateColorState()
     {
-        if (isHoveredOver && isSelected)
+        if (isSelected)
         {
-            tileSpriteRenderer.color = Color.green;
+            tileSpriteRenderer.color = new Color32(102, 153, 255, 255);
         }
-        else if (isHoveredOver)
+        else if (unit)
         {
-            tileSpriteRenderer.color = Color.yellow;
-        }
-        else if (isSelected)
-        {
-            tileSpriteRenderer.color = Color.cyan;
-        }
-        else if (isInMoveRange)
-        {
-            if (isCurrentPath)
+            if (unit.controllingPlayer != GameManager.GetInstance().currentPlayer)
             {
-                tileSpriteRenderer.color = Color.gray;
+                if (isUnitWithinRange)
+                {
+                    if (isHoveredOver)
+                    {
+                        tileSpriteRenderer.color = new Color32(128, 0, 0, 255);
+                    }
+                    else
+                    {
+                        tileSpriteRenderer.color = new Color32(153, 51, 51, 255);
+                    }
+                }
+                else
+                {
+                    tileSpriteRenderer.color = new Color32(255, 153, 102, 255);
+                }
             }
             else
             {
-                tileSpriteRenderer.color = Color.magenta;
+                tileSpriteRenderer.color = new Color32(153, 255, 102, 255);
             }
         }
-        else if (isEnemyWithinRange)
+        else if (isInMoveRange)
         {
-            tileSpriteRenderer.color = Color.red;
+            if (isCurrentPath && isHoveredOver)
+            {
+                tileSpriteRenderer.color = new Color32(0, 153, 255, 255);
+            }
+            else if (isCurrentPath)
+            {
+                tileSpriteRenderer.color = new Color32(51, 204, 255, 255);
+            }
+            else if (isWithinEnemyMoveRange)
+            {
+                if (isWithinAttackRange)
+                {
+                    tileSpriteRenderer.color = new Color32(102, 102, 153, 255);
+                }
+                else
+                {
+                    tileSpriteRenderer.color = new Color32(153, 153, 255, 255);
+                }
+            }
+            else if (isWithinAttackRange)
+            {
+                tileSpriteRenderer.color = new Color32(51, 102, 153, 255);
+            }
+            else
+            {
+                tileSpriteRenderer.color = new Color32(102, 204, 255, 255);
+            }
+        }
+        else if (isHoveredOver && isSelected)
+        {
+            // None if it is selected there is no need for coloring on hover
+        }
+        else if (isHoveredOver)
+        {
+            tileSpriteRenderer.color = new Color32(204, 255, 255, 255);
+        }
+        else if (GameManager.GetInstance().selectedTile && isWithinEnemyMoveRange)
+        {
+            tileSpriteRenderer.color = new Color32(255, 204, 255, 255);
         }
         else
         {

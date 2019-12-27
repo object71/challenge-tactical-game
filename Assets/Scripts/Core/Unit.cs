@@ -8,17 +8,19 @@ public class Unit : MonoBehaviour
     public int totalHealthPoints;
     public int attackRange;
     public int attackDamage;
+    public bool hasMoved;
     public bool hasAttacked;
     public bool isMoving = false;
+    public bool isBeingAttacked = false;
 
     public int remainingHealthPoints;
     public int remainingMovementPoints;
 
     public Player controllingPlayer;
+    public List<Vector3> movementPath;
 
     private SpriteRenderer rendererComponent;
     private GameManager gameManager;
-    private List<Vector3> movementPath;
     private int totalPathDistance;
     private float movementAnimationPerNode = 0.25f;
     private static WaitForSeconds halfSecondWait = new WaitForSeconds(0.5f);
@@ -29,7 +31,7 @@ public class Unit : MonoBehaviour
     {
         gameManager = GameManager.GetInstance();
         movementPath = new List<Vector3>(totalMovementPoints / 5);
-        rendererComponent = GetComponent<SpriteRenderer>();
+        rendererComponent = GetComponentInChildren<SpriteRenderer>();
     }
 
     // Update is called once per frame
@@ -49,30 +51,26 @@ public class Unit : MonoBehaviour
         rendererComponent.color = value ? controllingPlayer.selectedUnitColor : controllingPlayer.color;
     }
 
-    public void MoveToTile(Tile targetTile, PathfindingNode[,] graph)
+    public void PlayMoveAnimation()
     {
-        Vector2Int position = targetTile.GetMapPosition();
-
-        PathfindingNode node = graph[position.x, position.y];
-        while (node.parent != null)
-        {
-            movementPath.Add(node.tile.transform.position);
-            node = node.parent;
-        }
-
-        movementPath.Reverse();
-
-
         StartCoroutine("MoveByPath");
     }
 
-    public void PlayBlinkAnimation()
+    public void Hit(int damage)
     {
-        StartCoroutine("Blink");
+        remainingHealthPoints -= damage;
+        PlayAttackedAnimation();
     }
 
-    private IEnumerator Blink()
+    public void PlayAttackedAnimation()
     {
+        StartCoroutine("GetAttacked");
+    }
+
+    private IEnumerator GetAttacked()
+    {
+        isBeingAttacked = true;
+
         for (int i = 0; i < 4; i++)
         {
             rendererComponent.enabled = !rendererComponent.enabled;
@@ -80,6 +78,16 @@ public class Unit : MonoBehaviour
         }
 
         rendererComponent.enabled = true;
+
+        if (remainingHealthPoints <= 0)
+        {
+            DestroyImmediate(gameObject);
+            gameManager.CheckGameOverState();
+        }
+        else
+        {
+            isBeingAttacked = false;
+        }
     }
 
     private IEnumerator MoveByPath()
@@ -105,6 +113,13 @@ public class Unit : MonoBehaviour
         }
 
         transform.position = Vector3Int.RoundToInt(transform.position);
+
+        if (gameManager.noMovingAfterTheFirstOne)
+        {
+            hasMoved = true;
+            remainingMovementPoints = 0;
+        }
+
         isMoving = false;
         movementPath.Clear();
     }
