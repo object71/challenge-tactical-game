@@ -139,11 +139,13 @@ public class GameManager : MonoBehaviour {
         Camera.main.transform.position = new Vector3 (firstEncounteredUnit.transform.position.x, firstEncounteredUnit.transform.position.y, Camera.main.transform.position.z);
     }
 
-    public void CheckGameOverState () {
+    public void OnUnitDeath () {
         if (GameIsOver ()) {
             gameOverOverlay.SetActive (true);
             Text gameOverText = GameObject.Find ("GameOverText").GetComponent<Text> ();
             gameOverText.text = $"Player {currentPlayer.playerId} won!";
+        } else {
+            CalculatePossibleEnemyMoves ();
         }
     }
 
@@ -277,7 +279,7 @@ public class GameManager : MonoBehaviour {
                 if (oneActionOnly) {
                     SwitchPlayer ();
                 }
-            } else {
+            } else if (distanceToTarget != int.MaxValue) {
                 HandleMove (currentTile, targetTile);
             }
 

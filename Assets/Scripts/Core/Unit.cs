@@ -73,7 +73,7 @@ public class Unit : MonoBehaviour {
 
         if (remainingHealthPoints <= 0) {
             DestroyImmediate (gameObject);
-            gameManager.CheckGameOverState ();
+            gameManager.OnUnitDeath ();
         } else {
             isBeingAttacked = false;
         }

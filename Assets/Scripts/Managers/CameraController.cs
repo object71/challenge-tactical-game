@@ -12,7 +12,7 @@ public class CameraController : MonoBehaviour {
     public float minZoomSize = 1.0f;
     public float maxZoomSize = 10.0f;
 
-    Camera camera;
+    Camera thisCamera;
     public float halfHeight;
     public float halfWidth;
 
@@ -20,14 +20,14 @@ public class CameraController : MonoBehaviour {
 
     void Awake () {
         map = FindObjectOfType<Map> ();
-        camera = GetComponent<Camera> ();
+        thisCamera = GetComponent<Camera> ();
     }
 
     void Start () {
         targetCameraSize = Camera.main.orthographicSize;
 
-        halfHeight = camera.orthographicSize;
-        halfWidth = camera.aspect * halfHeight;
+        halfHeight = thisCamera.orthographicSize;
+        halfWidth = thisCamera.aspect * halfHeight;
     }
 
     // Update is called once per frame
@@ -79,11 +79,11 @@ public class CameraController : MonoBehaviour {
             targetCameraSize = Mathf.Clamp (targetCameraSize, minZoomSize, maxZoomSize);
         }
 
-        camera.orthographicSize = Mathf.MoveTowards (Camera.main.orthographicSize, targetCameraSize, smoothSpeed * Time.deltaTime);
+        thisCamera.orthographicSize = Mathf.MoveTowards (Camera.main.orthographicSize, targetCameraSize, smoothSpeed * Time.deltaTime);
 
         transform.position = position;
 
-        halfHeight = camera.orthographicSize;
-        halfWidth = camera.aspect * halfHeight;
+        halfHeight = thisCamera.orthographicSize;
+        halfWidth = thisCamera.aspect * halfHeight;
     }
 }
