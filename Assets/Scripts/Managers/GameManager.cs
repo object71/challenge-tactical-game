@@ -210,8 +210,10 @@ public class GameManager : MonoBehaviour {
                     return;
                 }
 
+                int distanceToMove = Mathf.Min (distanceToTarget - 1, currentTile.unit.remainingMovementPoints);
+
                 Vector2Int mapPosition = targetTile.GetMapPosition ();
-                Tile reachableTile = pathfinding.GetMaxReachableTile (mapPosition.x, mapPosition.y, currentTile.unit.remainingMovementPoints);
+                Tile reachableTile = pathfinding.GetMaxReachableTile (mapPosition.x, mapPosition.y, distanceToMove);
 
                 // if the unit can't pay the cost in that direction
                 if (reachableTile == currentTile) {
