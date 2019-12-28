@@ -7,8 +7,8 @@ using UnityEngine;
 public class Map : MonoBehaviour {
     public Tile tilePrefab;
 
-    public Sprite passableSprite;
-    public Sprite unpassableSprite;
+    public Sprite[] passableSprites;
+    public Sprite[] unpassableSprites;
     public Unit[] availableUnits;
 
     public int width;
@@ -44,10 +44,10 @@ public class Map : MonoBehaviour {
                 Tile tile = Instantiate (tilePrefab, new Vector3 (transform.position.x + x, transform.position.y + y, 5), Quaternion.identity, tileHolder.transform);
                 if ((x != 0 && x != width - 1) && (y != 0 && y != height - 1)) {
                     tile.SetWalkable (true);
-                    tile.SetSprite (passableSprite);
+                    tile.SetSprite (passableSprites[Random.Range (0, passableSprites.Length)]);
                 } else {
                     tile.SetWalkable (false);
-                    tile.SetSprite (unpassableSprite);
+                    tile.SetSprite (unpassableSprites[Random.Range (0, unpassableSprites.Length)]);
                 }
 
                 tile.mouseEnterLeaveEvent.AddListener (gameManager.OnMouseEnterTile);
@@ -90,10 +90,10 @@ public class Map : MonoBehaviour {
 
                 if (character == '*') {
                     tile.SetWalkable (false);
-                    tile.SetSprite (unpassableSprite);
+                    tile.SetSprite (unpassableSprites[Random.Range (0, unpassableSprites.Length)]);
                 } else {
                     tile.SetWalkable (true);
-                    tile.SetSprite (passableSprite);
+                    tile.SetSprite (passableSprites[Random.Range (0, passableSprites.Length)]);
                 }
 
                 tile.mouseEnterLeaveEvent.AddListener (gameManager.OnMouseEnterTile);

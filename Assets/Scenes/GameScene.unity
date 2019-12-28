@@ -2547,8 +2547,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tilePrefab: {fileID: 114845309709249074, guid: 4b17f32ef0c3b1647ad099b49909c078,
     type: 3}
-  passableSprite: {fileID: 21300002, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
-  unpassableSprite: {fileID: 21300000, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  passableSprites:
+  - {fileID: 21300028, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300024, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300022, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300018, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300012, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300008, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300006, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300002, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  unpassableSprites:
+  - {fileID: 21300000, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300004, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300010, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300014, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300016, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300020, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300026, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
+  - {fileID: 21300030, guid: 4c0b970f3750bd14ea51d8c6396fea94, type: 3}
   availableUnits:
   - {fileID: 3943045683275914376, guid: bde0870c71f3d9f4593451ffcf567dc6, type: 3}
   - {fileID: 4721315785103289588, guid: 1a977419e6479d74eb392f16ee053762, type: 3}
