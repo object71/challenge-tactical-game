@@ -17,8 +17,9 @@ public class GameManager : MonoBehaviour {
     public GameObject levelsOverlay;
     public Dropdown levelChooser;
 
-    private Text healthIndicator;
-    private Text movementIndicator;
+    public Text healthIndicator;
+    public Text movementIndicator;
+    public Text damageIndicator;
 
     private static GameManager instance;
     public static GameManager GetInstance () {
@@ -35,8 +36,6 @@ public class GameManager : MonoBehaviour {
     void Awake () {
         map = FindObjectOfType<Map> ();
         pathfinding = FindObjectOfType<PathfindingManager> ();
-        healthIndicator = GameObject.FindGameObjectWithTag ("health-points").GetComponent<Text> ();
-        movementIndicator = GameObject.FindGameObjectWithTag ("move-points").GetComponent<Text> ();
 
         gameOverOverlay.SetActive (false);
 
@@ -135,6 +134,9 @@ public class GameManager : MonoBehaviour {
         levelsOverlay.SetActive (false);
 
         CalculatePossibleEnemyMoves ();
+
+        Unit firstEncounteredUnit = GetFirstEncounteredUnit ();
+        Camera.main.transform.position = new Vector3 (firstEncounteredUnit.transform.position.x, firstEncounteredUnit.transform.position.y, Camera.main.transform.position.z);
     }
 
     public void CheckGameOverState () {
@@ -182,9 +184,11 @@ public class GameManager : MonoBehaviour {
         if (unit == null) {
             healthIndicator.text = "--/--";
             movementIndicator.text = "--/--";
+            damageIndicator.text = "--";
         } else {
             healthIndicator.text = string.Format ("{0}/{1}", unit.remainingHealthPoints, unit.totalHealthPoints);
             movementIndicator.text = string.Format ("{0}/{1}", unit.remainingMovementPoints, unit.totalMovementPoints);
+            damageIndicator.text = string.Format ("{0}", unit.attackDamage);
         }
     }
 
@@ -287,10 +291,6 @@ public class GameManager : MonoBehaviour {
                 Tile tile = map.GetTile (x, y);
 
                 if (tile.unit && tile.unit.controllingPlayer == currentPlayer) {
-                    if (Camera.current && tile) {
-                        Camera.current.transform.position = new Vector3 (tile.transform.position.x, tile.transform.position.y, Camera.current.transform.position.z);
-                    }
-
                     OnTileLeftClicked (tile);
                     yield return waitSeconds;
 
@@ -449,5 +449,18 @@ public class GameManager : MonoBehaviour {
         }
 
         return true;
+    }
+
+    private Unit GetFirstEncounteredUnit () {
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                Tile tile = map.GetTile (x, y);
+                if (tile.unit && tile.unit.controllingPlayer == currentPlayer) {
+                    return tile.unit;
+                }
+            }
+        }
+
+        return null;
     }
 }
