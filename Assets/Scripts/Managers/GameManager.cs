@@ -56,11 +56,11 @@ public class GameManager : MonoBehaviour {
             Debug.LogWarning ("Not enough players to play the game");
         }
 
-        if (gameOverOverlay) {
+        if (!gameOverOverlay) {
             Debug.LogWarning ("No game over screen");
         }
 
-        if (levelsOverlay) {
+        if (!levelsOverlay) {
             Debug.LogWarning ("No level choosing screen");
         }
 
@@ -69,23 +69,10 @@ public class GameManager : MonoBehaviour {
     }
 
     // Start is called before the first frame update
-    protected void Start () { }
-
-    private bool GameIsOver () {
-        for (int x = 0; x < map.width; x++) {
-            for (int y = 0; y < map.height; y++) {
-                Tile tile = map.GetTile (x, y);
-                if (tile.unit && tile.unit.controllingPlayer != currentPlayer) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
+    void Start () { }
 
     // Update is called once per frame
-    protected void Update () {
+    void Update () {
         if (!map || !pathfinding) {
             return;
         }
@@ -116,6 +103,29 @@ public class GameManager : MonoBehaviour {
         }
     }
 
+    public void OnTileRightClicked (Tile targetTile) {
+        Tile currentTile = selectedTile;
+        if (currentTile == null || currentTile.unit == null) {
+            return;
+        }
+
+        if (currentTile.unit.controllingPlayer != currentPlayer) {
+            return;
+        } else {
+            if (targetTile.unit == null) {
+                HandleMove (currentTile, targetTile);
+            } else if (targetTile.unit != null && targetTile.unit.controllingPlayer != currentPlayer) {
+                HandleAttack (currentTile, targetTile);
+            }
+        }
+    }
+
+    public void OnMouseEnterTile (Tile tile) {
+        if (selectedTile && selectedTile.unit && selectedTile.unit.controllingPlayer == currentPlayer) {
+            pathfinding.ShowTrail (tile);
+        }
+    }
+
     public void LoadLevel () {
         string chosenLevel = levelChooser.options[levelChooser.value].text;
         string level = System.IO.File.ReadAllText (chosenLevel);
@@ -125,6 +135,32 @@ public class GameManager : MonoBehaviour {
         levelsOverlay.SetActive (false);
 
         CalculatePossibleEnemyMoves ();
+    }
+
+    public void CheckGameOverState () {
+        if (GameIsOver ()) {
+            gameOverOverlay.SetActive (true);
+            Text gameOverText = GameObject.Find ("GameOverText").GetComponent<Text> ();
+            gameOverText.text = $"Player {currentPlayer.playerId} won!";
+        }
+    }
+
+    public void RestartGame () {
+        SceneManager.LoadScene (SceneManager.GetActiveScene ().buildIndex);
+    }
+
+    public void SwitchPlayer () {
+        pathfinding.ResetPaths ();
+        ResetMovementPoints ();
+
+        currentPlayer = players[0] == currentPlayer ? players[1] : players[0];
+
+        if (currentPlayer.isAI) {
+            StartCoroutine (PlayAI ());
+        } else {
+            CalculatePossibleEnemyMoves ();
+        }
+
     }
 
     private void SelectTile (Tile tile) {
@@ -244,88 +280,6 @@ public class GameManager : MonoBehaviour {
         }
     }
 
-    public void OnTileRightClicked (Tile targetTile) {
-        Tile currentTile = selectedTile;
-        if (currentTile == null || currentTile.unit == null) {
-            return;
-        }
-
-        if (currentTile.unit.controllingPlayer != currentPlayer) {
-            return;
-        } else {
-            if (targetTile.unit == null) {
-                HandleMove (currentTile, targetTile);
-            } else if (targetTile.unit != null && targetTile.unit.controllingPlayer != currentPlayer) {
-                HandleAttack (currentTile, targetTile);
-            }
-        }
-    }
-
-    public void CheckGameOverState () {
-        if (GameIsOver ()) {
-            gameOverOverlay.SetActive (true);
-            Text gameOverText = GameObject.Find ("GameOverText").GetComponent<Text> ();
-            gameOverText.text = $"Player {currentPlayer.playerId} won!";
-        }
-    }
-
-    public void RestartGame () {
-        SceneManager.LoadScene (SceneManager.GetActiveScene ().buildIndex);
-    }
-
-    private IEnumerator ExecuteMoveThenAttack (Tile targetTile, Tile sourceTile, Tile moveToTile, int reachableDistance) {
-        yield return ExecuteMoveAction (moveToTile, sourceTile, reachableDistance);
-        yield return ExecuteAttackAction (targetTile, moveToTile);
-    }
-
-    private IEnumerator ExecuteAttackAction (Tile defendingTile, Tile attackingTile) {
-        attackingTile.unit.hasAttacked = true;
-
-        while (defendingTile.unit && defendingTile.unit.isBeingAttacked) {
-            yield return endOfFrame;
-        }
-
-        if (!defendingTile.unit) {
-            attackingTile.unit.hasAttacked = false;
-        } else {
-            defendingTile.unit.Hit (attackingTile.unit.attackDamage);
-        }
-
-    }
-
-    private IEnumerator ExecuteMoveAction (Tile targetTile, Tile fromTile, int distance) {
-        pathfinding.SetUnitPathDirections (fromTile.unit, targetTile);
-        fromTile.unit.PlayMoveAnimation ();
-
-        fromTile.unit.remainingMovementPoints -= distance;
-        targetTile.unit = fromTile.unit;
-        fromTile.unit = null;
-
-        while (targetTile.unit && targetTile.unit.isMoving) {
-            yield return endOfFrame;
-        }
-    }
-
-    public void OnMouseEnterTile (Tile tile) {
-        if (selectedTile && selectedTile.unit && selectedTile.unit.controllingPlayer == currentPlayer) {
-            pathfinding.ShowTrail (tile);
-        }
-    }
-
-    public void SwitchPlayer () {
-        pathfinding.ResetPaths ();
-        ResetMovementPoints ();
-
-        currentPlayer = players[0] == currentPlayer ? players[1] : players[0];
-
-        if (currentPlayer.isAI) {
-            StartCoroutine (PlayAI ());
-        } else {
-            CalculatePossibleEnemyMoves ();
-        }
-
-    }
-
     private IEnumerator PlayAI () {
 
         for (int x = 0; x < map.width; x++) {
@@ -443,6 +397,52 @@ public class GameManager : MonoBehaviour {
                 }
 
                 if (!map.GetTile (x + m, y + n).unit) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private IEnumerator ExecuteMoveThenAttack (Tile targetTile, Tile sourceTile, Tile moveToTile, int reachableDistance) {
+        yield return ExecuteMoveAction (moveToTile, sourceTile, reachableDistance);
+        yield return ExecuteAttackAction (targetTile, moveToTile);
+    }
+
+    private IEnumerator ExecuteAttackAction (Tile defendingTile, Tile attackingTile) {
+        attackingTile.unit.hasAttacked = true;
+
+        while (defendingTile.unit && defendingTile.unit.isBeingAttacked) {
+            yield return endOfFrame;
+        }
+
+        if (!defendingTile.unit) {
+            attackingTile.unit.hasAttacked = false;
+        } else {
+            defendingTile.unit.Hit (attackingTile.unit.attackDamage);
+        }
+
+    }
+
+    private IEnumerator ExecuteMoveAction (Tile targetTile, Tile fromTile, int distance) {
+        pathfinding.SetUnitPathDirections (fromTile.unit, targetTile);
+        fromTile.unit.PlayMoveAnimation ();
+
+        fromTile.unit.remainingMovementPoints -= distance;
+        targetTile.unit = fromTile.unit;
+        fromTile.unit = null;
+
+        while (targetTile.unit && targetTile.unit.isMoving) {
+            yield return endOfFrame;
+        }
+    }
+
+    private bool GameIsOver () {
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                Tile tile = map.GetTile (x, y);
+                if (tile.unit && tile.unit.controllingPlayer != currentPlayer) {
                     return false;
                 }
             }
