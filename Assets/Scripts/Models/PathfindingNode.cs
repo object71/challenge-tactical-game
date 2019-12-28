@@ -1,9 +1,6 @@
-
-
 using UnityEngine;
 
-public class PathfindingNode
-{
+public class PathfindingNode {
     public Tile tile;
     public PathfindingNode parent;
     public bool passed;

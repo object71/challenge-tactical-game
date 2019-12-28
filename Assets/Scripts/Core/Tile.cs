@@ -2,10 +2,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Tile : MonoBehaviour
-{
+public class Tile : MonoBehaviour {
     public Unit unit;
-    public TileMouseEnterEvent mouseEnterLeaveEvent = new TileMouseEnterEvent();
+    public TileMouseEnterEvent mouseEnterLeaveEvent = new TileMouseEnterEvent ();
 
     private SpriteRenderer tileSpriteRenderer;
     private bool isWalkable;
@@ -18,191 +17,135 @@ public class Tile : MonoBehaviour
     public bool isWithinAttackRange;
 
     // Start is called before the first frame update
-    void Awake()
-    {
-        tileSpriteRenderer = GetComponent<SpriteRenderer>();
+    void Awake () {
+        tileSpriteRenderer = GetComponent<SpriteRenderer> ();
 
-        if (!tileSpriteRenderer)
-        {
-            Debug.LogWarning("Tile has no sprite renderer");
+        if (!tileSpriteRenderer) {
+            Debug.LogWarning ("Tile has no sprite renderer");
         }
     }
 
     // Update is called once per frame
-    void Update()
-    {
+    void Update () {
 
     }
 
-    void OnMouseEnter()
-    {
-        mouseEnterLeaveEvent.Invoke(this);
+    void OnMouseEnter () {
+        mouseEnterLeaveEvent.Invoke (this);
 
         isHoveredOver = true;
-        UpdateColorState();
+        UpdateColorState ();
     }
 
-    void OnMouseExit()
-    {
+    void OnMouseExit () {
         isHoveredOver = false;
-        UpdateColorState();
+        UpdateColorState ();
     }
 
-    public void SetSprite(Sprite sprite)
-    {
+    public void SetSprite (Sprite sprite) {
         tileSpriteRenderer.sprite = sprite;
     }
 
-    public bool IsWalkable()
-    {
+    public bool IsWalkable () {
         return isWalkable;
     }
 
-    public bool IsFree()
-    {
-        if (unit == null)
-        {
+    public bool IsFree () {
+        if (unit == null) {
             return true;
-        }
-        else
-        {
+        } else {
             return false;
         }
     }
 
-    public bool IsOccupied()
-    {
-        return !IsFree();
+    public bool IsOccupied () {
+        return !IsFree ();
     }
 
-    public void SetWalkable(bool value)
-    {
+    public void SetWalkable (bool value) {
         isWalkable = value;
     }
 
-    public void SetIsInMoveRange(bool value)
-    {
+    public void SetIsInMoveRange (bool value) {
         isInMoveRange = value;
-        UpdateColorState();
+        UpdateColorState ();
     }
 
-    public void SetIsUnitWithinRange(bool value)
-    {
+    public void SetIsUnitWithinRange (bool value) {
         isUnitWithinRange = value;
-        UpdateColorState();
+        UpdateColorState ();
     }
 
-    public void SetIsWithinEnemyMoveRange(bool value)
-    {
+    public void SetIsWithinEnemyMoveRange (bool value) {
         isWithinEnemyMoveRange = value;
-        UpdateColorState();
+        UpdateColorState ();
     }
 
-    public void SetIsWithinAttackRange(bool value)
-    {
+    public void SetIsWithinAttackRange (bool value) {
         isWithinAttackRange = value;
-        UpdateColorState();
+        UpdateColorState ();
     }
 
-    public void SetIsCurrentPath(bool value)
-    {
+    public void SetIsCurrentPath (bool value) {
         isCurrentPath = value;
-        UpdateColorState();
+        UpdateColorState ();
     }
 
-    public void UpdateColorState()
-    {
-        if (isSelected)
-        {
-            tileSpriteRenderer.color = new Color32(102, 153, 255, 255);
-        }
-        else if (unit)
-        {
-            if (unit.controllingPlayer != GameManager.GetInstance().currentPlayer)
-            {
-                if (isUnitWithinRange)
-                {
-                    if (isHoveredOver)
-                    {
-                        tileSpriteRenderer.color = new Color32(128, 0, 0, 255);
+    public void UpdateColorState () {
+        if (isSelected) {
+            tileSpriteRenderer.color = new Color32 (102, 153, 255, 255);
+        } else if (unit) {
+            if (unit.controllingPlayer != GameManager.GetInstance ().currentPlayer) {
+                if (isUnitWithinRange) {
+                    if (isHoveredOver) {
+                        tileSpriteRenderer.color = new Color32 (128, 0, 0, 255);
+                    } else {
+                        tileSpriteRenderer.color = new Color32 (153, 51, 51, 255);
                     }
-                    else
-                    {
-                        tileSpriteRenderer.color = new Color32(153, 51, 51, 255);
-                    }
+                } else {
+                    tileSpriteRenderer.color = new Color32 (255, 153, 102, 255);
                 }
-                else
-                {
-                    tileSpriteRenderer.color = new Color32(255, 153, 102, 255);
+            } else {
+                tileSpriteRenderer.color = new Color32 (153, 255, 102, 255);
+            }
+        } else if (isInMoveRange) {
+            if (isCurrentPath && isHoveredOver) {
+                tileSpriteRenderer.color = new Color32 (0, 153, 255, 255);
+            } else if (isCurrentPath) {
+                tileSpriteRenderer.color = new Color32 (51, 204, 255, 255);
+            } else if (isWithinEnemyMoveRange) {
+                if (isWithinAttackRange) {
+                    tileSpriteRenderer.color = new Color32 (102, 102, 153, 255);
+                } else {
+                    tileSpriteRenderer.color = new Color32 (153, 153, 255, 255);
                 }
+            } else if (isWithinAttackRange) {
+                tileSpriteRenderer.color = new Color32 (51, 102, 153, 255);
+            } else {
+                tileSpriteRenderer.color = new Color32 (102, 204, 255, 255);
             }
-            else
-            {
-                tileSpriteRenderer.color = new Color32(153, 255, 102, 255);
-            }
-        }
-        else if (isInMoveRange)
-        {
-            if (isCurrentPath && isHoveredOver)
-            {
-                tileSpriteRenderer.color = new Color32(0, 153, 255, 255);
-            }
-            else if (isCurrentPath)
-            {
-                tileSpriteRenderer.color = new Color32(51, 204, 255, 255);
-            }
-            else if (isWithinEnemyMoveRange)
-            {
-                if (isWithinAttackRange)
-                {
-                    tileSpriteRenderer.color = new Color32(102, 102, 153, 255);
-                }
-                else
-                {
-                    tileSpriteRenderer.color = new Color32(153, 153, 255, 255);
-                }
-            }
-            else if (isWithinAttackRange)
-            {
-                tileSpriteRenderer.color = new Color32(51, 102, 153, 255);
-            }
-            else
-            {
-                tileSpriteRenderer.color = new Color32(102, 204, 255, 255);
-            }
-        }
-        else if (isHoveredOver && isSelected)
-        {
+        } else if (isHoveredOver && isSelected) {
             // None if it is selected there is no need for coloring on hover
-        }
-        else if (isHoveredOver)
-        {
-            tileSpriteRenderer.color = new Color32(204, 255, 255, 255);
-        }
-        else if (GameManager.GetInstance().selectedTile && isWithinEnemyMoveRange)
-        {
-            tileSpriteRenderer.color = new Color32(255, 204, 255, 255);
-        }
-        else
-        {
+        } else if (isHoveredOver) {
+            tileSpriteRenderer.color = new Color32 (204, 255, 255, 255);
+        } else if (GameManager.GetInstance ().selectedTile && isWithinEnemyMoveRange) {
+            tileSpriteRenderer.color = new Color32 (255, 204, 255, 255);
+        } else {
             tileSpriteRenderer.color = Color.white;
         }
     }
 
-    public void SetIsSelected(bool value)
-    {
+    public void SetIsSelected (bool value) {
         isSelected = value;
 
-        if (unit)
-        {
-            unit.SetIsSelected(value);
+        if (unit) {
+            unit.SetIsSelected (value);
         }
 
-        UpdateColorState();
+        UpdateColorState ();
     }
 
-    public Vector2Int GetMapPosition()
-    {
-        return new Vector2Int((int)transform.position.x, (int)transform.position.y);
+    public Vector2Int GetMapPosition () {
+        return new Vector2Int ((int) transform.position.x, (int) transform.position.y);
     }
 }

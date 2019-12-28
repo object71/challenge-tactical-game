@@ -123,13 +123,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31847696a9f22f04a81eef4589bc1cf4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  totalMovementPoints: 50
-  totalHealthPoints: 5
-  attackRange: 12
-  attackDamage: 1
+  totalMovementPoints: 21
+  totalHealthPoints: 15
+  attackRange: 7
+  attackDamage: 10
+  hasMoved: 0
   hasAttacked: 0
   isMoving: 0
-  remainingHealthPoints: 5
-  remainingMovementPoints: 50
+  isBeingAttacked: 0
+  remainingHealthPoints: 15
+  remainingMovementPoints: 21
   controllingPlayer: {fileID: 0}
   movementPath: []
+  type: 77

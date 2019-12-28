@@ -1,90 +1,81 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Linq;
-using UnityEngine.UI;
+using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
-public class GameManager : MonoBehaviour
-{
+public class GameManager : MonoBehaviour {
     public Tile selectedTile;
-
-    public Unit[] availableUnits;
     private Map map;
     public PathfindingManager pathfinding;
     public Player[] players;
     public Player currentPlayer;
     public bool noMovingAfterTheFirstOne = false;
     public bool oneActionOnly = false;
+    public GameObject gameOverOverlay;
+    public GameObject levelsOverlay;
+    public Dropdown levelChooser;
 
     private Text healthIndicator;
     private Text movementIndicator;
-    public GameObject overlay;
 
     private static GameManager instance;
-
-    public static GameManager GetInstance()
-    {
-        if (instance == null)
-        {
-            instance = FindObjectOfType<GameManager>();
+    public static GameManager GetInstance () {
+        if (instance == null) {
+            instance = FindObjectOfType<GameManager> ();
         }
 
         return instance;
     }
 
-    private static WaitForEndOfFrame endOfFrame = new WaitForEndOfFrame();
-    private static WaitForSeconds waitSeconds = new WaitForSeconds(1f);
+    private static readonly WaitForEndOfFrame endOfFrame = new WaitForEndOfFrame ();
+    private static readonly WaitForSeconds waitSeconds = new WaitForSeconds (1f);
 
-    void Awake()
-    {
-        map = FindObjectOfType<Map>();
-        pathfinding = FindObjectOfType<PathfindingManager>();
-        healthIndicator = GameObject.FindGameObjectWithTag("health-points").GetComponent<Text>();
-        movementIndicator = GameObject.FindGameObjectWithTag("move-points").GetComponent<Text>();
+    void Awake () {
+        map = FindObjectOfType<Map> ();
+        pathfinding = FindObjectOfType<PathfindingManager> ();
+        healthIndicator = GameObject.FindGameObjectWithTag ("health-points").GetComponent<Text> ();
+        movementIndicator = GameObject.FindGameObjectWithTag ("move-points").GetComponent<Text> ();
 
-        overlay.SetActive(false);
+        gameOverOverlay.SetActive (false);
 
-        if (!map)
-        {
-            Debug.LogWarning("Map not found");
+        if (!map) {
+            Debug.LogWarning ("Map not found");
         }
+
+        if (!levelChooser) {
+            Debug.LogWarning ("Level dropdown not found");
+        }
+
+        if (!pathfinding) {
+            Debug.LogWarning ("Pathfinding manager not found");
+        }
+
+        if (players.Length < 2) {
+            Debug.LogWarning ("Not enough players to play the game");
+        }
+
+        if (gameOverOverlay) {
+            Debug.LogWarning ("No game over screen");
+        }
+
+        if (levelsOverlay) {
+            Debug.LogWarning ("No level choosing screen");
+        }
+
+        levelChooser.options.Clear ();
+        levelChooser.options.AddRange (System.IO.Directory.GetFiles ("./levels").Select (x => new Dropdown.OptionData (x)).ToArray ());
     }
 
     // Start is called before the first frame update
-    protected void Start()
-    {
-        Unit prefab = availableUnits[Random.Range(0, availableUnits.Length)];
+    protected void Start () { }
 
-        CreateUnit(prefab, players[0], 5, 3);
-        // CreateUnit(prefab, players[0], 6, 3);
-        // CreateUnit(prefab, players[0], 7, 3);
-
-        CreateUnit(prefab, players[1], 5, 5);
-        CreateUnit(prefab, players[1], 6, 5);
-        CreateUnit(prefab, players[1], 7, 5);
-
-
-        CalculatePossibleEnemyMoves();
-
-    }
-
-    private void CreateUnit(Unit prefab, Player player, int x, int y)
-    {
-        Unit unit = Instantiate(prefab, new Vector3(x, y), Quaternion.identity, map.transform);
-        unit.SetControllingPlayer(player);
-        map.AddUnit(x, y, unit);
-    }
-
-    private bool GameIsOver()
-    {
-        for (int x = 0; x < map.width; x++)
-        {
-            for (int y = 0; y < map.height; y++)
-            {
-                Tile tile = map.GetTile(x, y);
-                if (tile.unit && tile.unit.controllingPlayer != currentPlayer)
-                {
+    private bool GameIsOver () {
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                Tile tile = map.GetTile (x, y);
+                if (tile.unit && tile.unit.controllingPlayer != currentPlayer) {
                     return false;
                 }
             }
@@ -94,340 +85,290 @@ public class GameManager : MonoBehaviour
     }
 
     // Update is called once per frame
-    protected void Update()
-    {
-        if (!currentPlayer.isAI && Input.GetMouseButtonUp(0))
-        {
-            Tile tile = InteractionHelpers.GetClickedElement<Tile>();
-            if (tile)
-            {
-                OnTileLeftClicked(tile);
-            }
+    protected void Update () {
+        if (!map || !pathfinding) {
+            return;
         }
-        else if (!currentPlayer.isAI && Input.GetMouseButtonUp(1))
-        {
-            Tile tile = InteractionHelpers.GetClickedElement<Tile>();
-            if (tile)
-            {
-                OnTileRightClicked(tile);
 
-                if (!UnitsHaveActions())
-                {
-                    SwitchPlayer();
+        if (!currentPlayer.isAI && Input.GetMouseButtonUp (0)) {
+            Tile tile = InteractionHelpers.GetClickedElement<Tile> ();
+            if (tile) {
+                OnTileLeftClicked (tile);
+            }
+        } else if (!currentPlayer.isAI && Input.GetMouseButtonUp (1)) {
+            Tile tile = InteractionHelpers.GetClickedElement<Tile> ();
+            if (tile) {
+                OnTileRightClicked (tile);
+
+                if (!UnitsHaveActions ()) {
+                    SwitchPlayer ();
                 }
 
             }
         }
     }
 
-    public void OnTileLeftClicked(Tile tile)
-    {
-        if (tile.unit != null)
-        {
-            SelectTile(tile);
-        }
-        else
-        {
-            DeselectTile();
+    public void OnTileLeftClicked (Tile tile) {
+        if (tile.unit != null) {
+            SelectTile (tile);
+        } else {
+            DeselectTile ();
         }
     }
 
-    private void SelectTile(Tile tile)
-    {
-        if (selectedTile)
-        {
-            selectedTile.SetIsSelected(false);
-            SetUIUnitInformation(null);
+    public void LoadLevel () {
+        string chosenLevel = levelChooser.options[levelChooser.value].text;
+        string level = System.IO.File.ReadAllText (chosenLevel);
+        map.LoadMap (level);
+        pathfinding.InitiateNew ();
+
+        levelsOverlay.SetActive (false);
+
+        CalculatePossibleEnemyMoves ();
+    }
+
+    private void SelectTile (Tile tile) {
+        if (selectedTile) {
+            selectedTile.SetIsSelected (false);
+            SetUIUnitInformation (null);
         }
 
-        if (!tile.unit.isMoving)
-        {
+        if (!tile.unit.isMoving) {
             selectedTile = tile;
-            selectedTile.SetIsSelected(true);
+            selectedTile.SetIsSelected (true);
 
-            pathfinding.CalculatePathsAndSetStates(selectedTile);
-            SetUIUnitInformation(tile.unit);
+            pathfinding.CalculatePathsAndSetStates (selectedTile);
+            SetUIUnitInformation (tile.unit);
         }
     }
 
-    private void SetUIUnitInformation(Unit unit)
-    {
-        if (unit == null)
-        {
+    private void SetUIUnitInformation (Unit unit) {
+        if (unit == null) {
             healthIndicator.text = "--/--";
             movementIndicator.text = "--/--";
-        }
-        else
-        {
-            healthIndicator.text = string.Format("{0}/{1}", unit.remainingHealthPoints, unit.totalHealthPoints);
-            movementIndicator.text = string.Format("{0}/{1}", unit.remainingMovementPoints, unit.totalMovementPoints);
+        } else {
+            healthIndicator.text = string.Format ("{0}/{1}", unit.remainingHealthPoints, unit.totalHealthPoints);
+            movementIndicator.text = string.Format ("{0}/{1}", unit.remainingMovementPoints, unit.totalMovementPoints);
         }
     }
 
-    private void DeselectTile()
-    {
-        if (selectedTile)
-        {
-            selectedTile.SetIsSelected(false);
-            SetUIUnitInformation(null);
+    private void DeselectTile () {
+        if (selectedTile) {
+            selectedTile.SetIsSelected (false);
+            SetUIUnitInformation (null);
         }
 
         selectedTile = null;
 
-        pathfinding.ResetPaths();
+        pathfinding.ResetPaths ();
     }
 
-    private void HandleMove(Tile currentTile, Tile targetTile)
-    {
-        if (noMovingAfterTheFirstOne && currentTile.unit.hasMoved)
-        {
+    private void HandleMove (Tile currentTile, Tile targetTile) {
+        if (currentTile == targetTile) {
+            DeselectTile ();
+        }
+
+        if (noMovingAfterTheFirstOne && currentTile.unit.hasMoved) {
             return;
         }
 
-        Vector2Int mapPosition = targetTile.GetMapPosition();
+        Vector2Int mapPosition = targetTile.GetMapPosition ();
 
-        Tile reachableTile = pathfinding.GetMaxReachableTile(mapPosition.x, mapPosition.y, currentTile.unit.remainingMovementPoints);
-        Vector2Int reachablePosition = reachableTile.GetMapPosition();
-        int reachableDistance = pathfinding.GetDistanceToNode(reachablePosition.x, reachablePosition.y);
+        Tile reachableTile = pathfinding.GetMaxReachableTile (mapPosition.x, mapPosition.y, currentTile.unit.remainingMovementPoints);
+        if (reachableTile == currentTile) {
+            return;
+        }
 
-        StartCoroutine(ExecuteMoveAction(reachableTile, currentTile, reachableDistance));
+        Vector2Int reachablePosition = reachableTile.GetMapPosition ();
+        int reachableDistance = pathfinding.GetDistanceToNode (reachablePosition.x, reachablePosition.y);
 
-        targetTile.SetIsSelected(false);
-        DeselectTile();
+        StartCoroutine (ExecuteMoveAction (reachableTile, currentTile, reachableDistance));
 
-        if (oneActionOnly)
-        {
-            SwitchPlayer();
+        targetTile.SetIsSelected (false);
+        DeselectTile ();
+
+        if (oneActionOnly) {
+            SwitchPlayer ();
         }
     }
 
-    private void HandleAttack(Tile currentTile, Tile targetTile)
-    {
-        Vector2Int coordinate = targetTile.GetMapPosition();
-        if (!currentTile.unit.hasAttacked)
-        {
-            int distanceToTarget = pathfinding.GetDistanceToNode(coordinate.x, coordinate.y);
-            if (distanceToTarget <= currentTile.unit.attackRange)
-            {
-                StartCoroutine(ExecuteAttackAction(targetTile, currentTile));
+    private void HandleAttack (Tile currentTile, Tile targetTile) {
+        Vector2Int coordinate = targetTile.GetMapPosition ();
+        if (!currentTile.unit.hasAttacked) {
+            int distanceToTarget = pathfinding.GetDistanceToNode (coordinate.x, coordinate.y);
+            if (distanceToTarget <= currentTile.unit.attackRange) {
+                StartCoroutine (ExecuteAttackAction (targetTile, currentTile));
 
-                targetTile.SetIsSelected(false);
-                DeselectTile();
+                targetTile.SetIsSelected (false);
+                DeselectTile ();
 
-                if (oneActionOnly)
-                {
-                    SwitchPlayer();
+                if (oneActionOnly) {
+                    SwitchPlayer ();
                 }
-            }
-            else if (distanceToTarget <= currentTile.unit.attackRange + currentTile.unit.remainingMovementPoints)
-            {
-                if (noMovingAfterTheFirstOne && currentTile.unit.hasMoved)
-                {
+            } else if (distanceToTarget <= currentTile.unit.attackRange + currentTile.unit.remainingMovementPoints) {
+                if (noMovingAfterTheFirstOne && currentTile.unit.hasMoved) {
                     return;
                 }
 
-                int distanceToMove = distanceToTarget - currentTile.unit.attackRange;
+                int distanceToMove = distanceToTarget - 1 > currentTile.unit.remainingMovementPoints ? currentTile.unit.remainingMovementPoints : distanceToTarget - 1;
 
-                if (distanceToMove > currentTile.unit.remainingMovementPoints)
-                {
+                Vector2Int mapPosition = targetTile.GetMapPosition ();
+                Tile reachableTile = pathfinding.GetMaxReachableTile (mapPosition.x, mapPosition.y, distanceToTarget - 1);
+
+                // if the unit can't pay the cost in that direction
+                if (reachableTile == currentTile) {
                     return;
                 }
 
-                if (distanceToMove < 7 && currentTile.unit.remainingMovementPoints >= 7)
-                {
-                    distanceToMove = 7;
-                }
-                else if (distanceToMove < 5 && currentTile.unit.remainingMovementPoints >= 5)
-                {
-                    distanceToMove = 5;
-                }
+                Vector2Int reachablePosition = reachableTile.GetMapPosition ();
+                int reachableDistance = pathfinding.GetDistanceToNode (reachablePosition.x, reachablePosition.y);
 
-                Vector2Int mapPosition = targetTile.GetMapPosition();
-                Tile reachableTile = pathfinding.GetMaxReachableTile(mapPosition.x, mapPosition.y, distanceToMove);
-
-                if (reachableTile == currentTile)
-                {
+                // if the distance we travel is still not enough (could happen because of different costs on diagonals)
+                if (reachableDistance < distanceToTarget - currentTile.unit.attackRange) {
                     return;
                 }
 
-                Vector2Int reachablePosition = reachableTile.GetMapPosition();
-                int reachableDistance = pathfinding.GetDistanceToNode(reachablePosition.x, reachablePosition.y);
+                StartCoroutine (ExecuteMoveThenAttack (targetTile, currentTile, reachableTile, reachableDistance));
 
-                StartCoroutine(ExecuteMoveThenAttack(targetTile, currentTile, reachableTile, reachableDistance));
+                currentTile.SetIsSelected (false);
+                reachableTile.SetIsSelected (false);
+                DeselectTile ();
 
-                currentTile.SetIsSelected(false);
-                reachableTile.SetIsSelected(false);
-                DeselectTile();
-
-                if (oneActionOnly)
-                {
-                    SwitchPlayer();
+                if (oneActionOnly) {
+                    SwitchPlayer ();
                 }
+            } else {
+                HandleMove (currentTile, targetTile);
             }
-            else
-            {
-                HandleMove(currentTile, targetTile);
-            }
-
 
         }
     }
 
-    public void OnTileRightClicked(Tile targetTile)
-    {
+    public void OnTileRightClicked (Tile targetTile) {
         Tile currentTile = selectedTile;
-        if (currentTile == null || currentTile.unit == null)
-        {
+        if (currentTile == null || currentTile.unit == null) {
             return;
         }
 
-        if (currentTile.unit.controllingPlayer != currentPlayer)
-        {
+        if (currentTile.unit.controllingPlayer != currentPlayer) {
             return;
-        }
-        else
-        {
-            if (targetTile.unit == null)
-            {
-                HandleMove(currentTile, targetTile);
-            }
-            else if (targetTile.unit != null && targetTile.unit.controllingPlayer != currentPlayer)
-            {
-                HandleAttack(currentTile, targetTile);
+        } else {
+            if (targetTile.unit == null) {
+                HandleMove (currentTile, targetTile);
+            } else if (targetTile.unit != null && targetTile.unit.controllingPlayer != currentPlayer) {
+                HandleAttack (currentTile, targetTile);
             }
         }
     }
 
-    public void CheckGameOverState()
-    {
-        if (GameIsOver())
-        {
-            overlay.SetActive(true);
-            Text gameOverText = GameObject.Find("GameOverText").GetComponent<Text>();
+    public void CheckGameOverState () {
+        if (GameIsOver ()) {
+            gameOverOverlay.SetActive (true);
+            Text gameOverText = GameObject.Find ("GameOverText").GetComponent<Text> ();
             gameOverText.text = $"Player {currentPlayer.playerId} won!";
         }
     }
 
-    public void RestartGame()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    public void RestartGame () {
+        SceneManager.LoadScene (SceneManager.GetActiveScene ().buildIndex);
     }
 
-    private IEnumerator ExecuteMoveThenAttack(Tile targetTile, Tile sourceTile, Tile moveToTile, int reachableDistance)
-    {
-        yield return ExecuteMoveAction(moveToTile, sourceTile, reachableDistance);
-        yield return ExecuteAttackAction(targetTile, moveToTile);
+    private IEnumerator ExecuteMoveThenAttack (Tile targetTile, Tile sourceTile, Tile moveToTile, int reachableDistance) {
+        yield return ExecuteMoveAction (moveToTile, sourceTile, reachableDistance);
+        yield return ExecuteAttackAction (targetTile, moveToTile);
     }
 
-    private IEnumerator ExecuteAttackAction(Tile defendingTile, Tile attackingTile)
-    {
+    private IEnumerator ExecuteAttackAction (Tile defendingTile, Tile attackingTile) {
         attackingTile.unit.hasAttacked = true;
 
-        while (defendingTile.unit && defendingTile.unit.isBeingAttacked)
-        {
+        while (defendingTile.unit && defendingTile.unit.isBeingAttacked) {
             yield return endOfFrame;
         }
 
-        if (!defendingTile.unit)
-        {
+        if (!defendingTile.unit) {
             attackingTile.unit.hasAttacked = false;
-        }
-        else
-        {
-            defendingTile.unit.Hit(attackingTile.unit.attackDamage);
+        } else {
+            defendingTile.unit.Hit (attackingTile.unit.attackDamage);
         }
 
     }
 
-    private IEnumerator ExecuteMoveAction(Tile targetTile, Tile fromTile, int distance)
-    {
-        pathfinding.SetUnitPathDirections(fromTile.unit, targetTile);
-        fromTile.unit.PlayMoveAnimation();
+    private IEnumerator ExecuteMoveAction (Tile targetTile, Tile fromTile, int distance) {
+        pathfinding.SetUnitPathDirections (fromTile.unit, targetTile);
+        fromTile.unit.PlayMoveAnimation ();
 
         fromTile.unit.remainingMovementPoints -= distance;
         targetTile.unit = fromTile.unit;
         fromTile.unit = null;
 
-        while (targetTile.unit.isMoving)
-        {
+        while (targetTile.unit && targetTile.unit.isMoving) {
             yield return endOfFrame;
         }
     }
 
-    public void OnMouseEnterTile(Tile tile)
-    {
-        if (selectedTile && selectedTile.unit && selectedTile.unit.controllingPlayer == currentPlayer)
-        {
-            pathfinding.ShowTrail(tile);
+    public void OnMouseEnterTile (Tile tile) {
+        if (selectedTile && selectedTile.unit && selectedTile.unit.controllingPlayer == currentPlayer) {
+            pathfinding.ShowTrail (tile);
         }
     }
 
-    public void SwitchPlayer()
-    {
-        pathfinding.ResetPaths();
-        ResetMovementPoints();
+    public void SwitchPlayer () {
+        pathfinding.ResetPaths ();
+        ResetMovementPoints ();
 
         currentPlayer = players[0] == currentPlayer ? players[1] : players[0];
 
-        if (currentPlayer.isAI)
-        {
-            StartCoroutine(PlayAI());
-        }
-        else
-        {
-            CalculatePossibleEnemyMoves();
+        if (currentPlayer.isAI) {
+            StartCoroutine (PlayAI ());
+        } else {
+            CalculatePossibleEnemyMoves ();
         }
 
     }
 
-    private IEnumerator PlayAI()
-    {
+    private IEnumerator PlayAI () {
 
-        for (int x = 0; x < map.width; x++)
-        {
-            for (int y = 0; y < map.height; y++)
-            {
-                Tile tile = map.GetTile(x, y);
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                Tile tile = map.GetTile (x, y);
 
-                if (tile.unit)
-                {
-                    OnTileLeftClicked(tile);
+                if (tile.unit && tile.unit.controllingPlayer == currentPlayer) {
+                    if (Camera.current && tile) {
+                        Camera.current.transform.position = new Vector3 (tile.transform.position.x, tile.transform.position.y, Camera.current.transform.position.z);
+                    }
+
+                    OnTileLeftClicked (tile);
                     yield return waitSeconds;
 
-                    OnTileRightClicked(FindClosestEnemy());
+                    OnTileRightClicked (FindClosestEnemy ());
                     yield return waitSeconds;
                 }
 
             }
         }
 
-        DeselectTile();
+        DeselectTile ();
         yield return waitSeconds;
 
-        if (!oneActionOnly)
-        {
-            SwitchPlayer();
+        if (!oneActionOnly) {
+            SwitchPlayer ();
         }
     }
 
-    private Tile FindClosestEnemy()
-    {
+    private Tile FindClosestEnemy () {
         Tile closest = null;
         int closestDistance = int.MaxValue;
 
-        for (int x = 0; x < map.width; x++)
-        {
-            for (int y = 0; y < map.height; y++)
-            {
-                Tile tile = map.GetTile(x, y);
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                Tile tile = map.GetTile (x, y);
 
-                if (tile.unit && tile.unit.controllingPlayer != currentPlayer)
-                {
-                    int distance = pathfinding.GetDistanceToNode(x, y);
+                if (tile.unit && tile.unit.controllingPlayer != currentPlayer) {
+                    int distance = pathfinding.GetDistanceToNode (x, y);
 
-                    if (!closest || distance < closestDistance)
-                    {
+                    if (!closest || distance < closestDistance) {
                         closest = tile;
+                        closestDistance = distance;
                     }
                 }
             }
@@ -436,34 +377,26 @@ public class GameManager : MonoBehaviour
         return closest;
     }
 
-    private void CalculatePossibleEnemyMoves()
-    {
-        pathfinding.ClearPossibleEnemyMoves();
+    private void CalculatePossibleEnemyMoves () {
+        pathfinding.ClearPossibleEnemyMoves ();
 
-        for (int x = 0; x < map.width; x++)
-        {
-            for (int y = 0; y < map.height; y++)
-            {
-                Tile currentTile = map.GetTile(x, y);
-                if (currentTile.unit && currentTile.unit.controllingPlayer != currentPlayer)
-                {
-                    pathfinding.CalculateEnemyPathsAndSetStates(currentTile);
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                Tile currentTile = map.GetTile (x, y);
+                if (currentTile.unit && currentTile.unit.controllingPlayer != currentPlayer) {
+                    pathfinding.CalculateEnemyPathsAndSetStates (currentTile);
                 }
             }
         }
 
     }
 
-    private void ResetMovementPoints()
-    {
-        for (int x = 0; x < map.width; x++)
-        {
-            for (int y = 0; y < map.height; y++)
-            {
-                Tile tile = map.GetTile(x, y);
+    private void ResetMovementPoints () {
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                Tile tile = map.GetTile (x, y);
 
-                if (tile.unit != null)
-                {
+                if (tile.unit != null) {
                     tile.unit.hasAttacked = false;
                     tile.unit.remainingMovementPoints = tile.unit.totalMovementPoints;
                 }
@@ -471,31 +404,24 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private bool UnitsHaveActions()
-    {
-        for (int x = 0; x < map.width; x++)
-        {
-            for (int y = 0; y < map.height; y++)
-            {
-                Tile tile = map.GetTile(x, y);
+    private bool UnitsHaveActions () {
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                Tile tile = map.GetTile (x, y);
 
-                if (tile.unit != null && tile.unit.controllingPlayer == currentPlayer)
-                {
+                if (tile.unit != null && tile.unit.controllingPlayer == currentPlayer) {
                     // only one move and it hasn't moved (not considering a case with a static unit)
-                    if (noMovingAfterTheFirstOne && !tile.unit.hasMoved)
-                    {
+                    if (noMovingAfterTheFirstOne && !tile.unit.hasMoved) {
                         return true;
                     }
 
                     // has not attacked attack (not checking if enemies within range)
-                    if (!tile.unit.hasAttacked)
-                    {
+                    if (!tile.unit.hasAttacked) {
                         return true;
                     }
 
                     // isn't surrounded and has more movement points
-                    if (tile.unit.remainingMovementPoints >= 5 && !IsSurrounded(x, y, tile.unit.remainingMovementPoints >= 7))
-                    {
+                    if (tile.unit.remainingMovementPoints >= 5 && !IsSurrounded (x, y, tile.unit.remainingMovementPoints >= 7)) {
                         return true;
                     }
                 }
@@ -505,24 +431,18 @@ public class GameManager : MonoBehaviour
         return false;
     }
 
-    private bool IsSurrounded(int x, int y, bool includeDiagonals)
-    {
-        for (int m = -1; m <= 1; m++)
-        {
-            for (int n = -1; n <= 1; n++)
-            {
-                if (m == 0 & n == 0)
-                {
+    private bool IsSurrounded (int x, int y, bool includeDiagonals) {
+        for (int m = -1; m <= 1; m++) {
+            for (int n = -1; n <= 1; n++) {
+                if (m == 0 & n == 0) {
                     continue;
                 }
 
-                if (!includeDiagonals && Mathf.Abs(m) == Mathf.Abs(n))
-                {
+                if (!includeDiagonals && Mathf.Abs (m) == Mathf.Abs (n)) {
                     continue;
                 }
 
-                if (!map.GetTile(x + m, y + n).unit)
-                {
+                if (!map.GetTile (x + m, y + n).unit) {
                     return false;
                 }
             }
