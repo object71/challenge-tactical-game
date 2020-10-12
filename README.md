@@ -1,4 +1,4 @@
-[<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" >](https://www.buymeacoffee.com/object71)
+[<a href="https://www.buymeacoffee.com/object71" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>]
 
 # Кратко описание
 Unity 3D (използвайки C#) походова тактическа игра
